@@ -1,0 +1,42 @@
+# Health endpoint is reachable only within the telemetry Docker network.
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 128
+    spike_limit_mib: 32
+  batch:
+    send_batch_size: 100
+    timeout: 1s
+exporters:
+  otlphttp/causaltrace:
+    traces_endpoint: http://api:8000/v1/traces
+    metrics_endpoint: http://api:8000/v1/metrics
+    headers:
+      x-api-key: ${env:CAUSALTRACE_API_KEY}
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 10s
+      max_elapsed_time: 60s
+    sending_queue:
+      enabled: true
+      queue_size: 100
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/causaltrace]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/causaltrace]

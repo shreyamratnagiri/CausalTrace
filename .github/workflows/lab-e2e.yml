@@ -1,0 +1,105 @@
+name: Isolated CausalTrace Lab Acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "causaltrace/**"
+      - "demo/**"
+      - "infra/**"
+      - "scripts/**"
+      - "web/**"
+      - "docker-compose*.yml"
+      - ".github/workflows/lab-e2e.yml"
+
+jobs:
+  live-laboratory:
+    runs-on: ubuntu-latest
+    env:
+      COMPOSE_PROJECT_NAME: ctci${{ github.run_id }}${{ github.run_attempt }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Enforce verified npm dependency graph
+        run: test -s web/package-lock.json || { echo 'A genuine committed web/package-lock.json is required'; exit 1; }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Generate ephemeral lab secrets
+        run: |
+          python - <<'PY'
+          import secrets
+          from pathlib import Path
+          Path('.env').write_text('CAUSALTRACE_API_KEY='+secrets.token_urlsafe(36)+'\nDB_PASSWORD='+secrets.token_urlsafe(36)+'\n')
+          PY
+          chmod 600 .env
+      - name: Install validation dependencies
+        run: python -m pip install -e '.[dev]'
+      - name: Validate Compose config
+        run: docker compose -f docker-compose.yml -f docker-compose.lab.yml config -q
+      - name: Start healthy instrumented ten-role laboratory
+        run: docker compose -f docker-compose.yml -f docker-compose.lab.yml up -d --build --wait --wait-timeout 240
+      - name: Verify Collector health through isolated telemetry network
+        run: docker compose -f docker-compose.yml -f docker-compose.lab.yml exec -T gateway python -c 'import urllib.request; assert urllib.request.urlopen("http://collector:13133/", timeout=5).status == 200'
+      - name: Verify migrated live PostgreSQL with real transactions
+        run: docker compose -f docker-compose.yml -f docker-compose.lab.yml --profile verification run --build --rm postgres-check
+      - name: Real checkout + three isolated faults + recovery + report
+        run: |
+          set -a
+          source .env
+          set +a
+          python scripts/verify_live.py --timeout 160
+      - name: Install frontend with locked dependencies
+        working-directory: web
+        run: npm ci --no-audit --no-fund
+      - name: Install Playwright Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+      - name: Browser-to-actual-API validation
+        working-directory: web
+        env:
+          CAUSALTRACE_REQUIRE_LIVE: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          # GitHub Actions steps do not share exported shell variables.
+          # Read only the generated operator key; never print its value.
+          test -f ../.env || { echo 'Missing ephemeral lab environment' >&2; exit 1; }
+          source ../.env
+          : "${CAUSALTRACE_API_KEY:?Missing lab operator API key}"
+          export CAUSALTRACE_API_KEY
+          # Confirm that the very same key authenticates against the live API.
+          curl --fail --silent --show-error --max-time 10 \
+            --header "x-api-key: ${CAUSALTRACE_API_KEY}" \
+            'http://127.0.0.1:8000/api/traces?limit=1' -o /dev/null
+          npm run test:e2e
+      - name: Measured local lab ingestion and query timing
+        run: |
+          set -a
+          source .env
+          set +a
+          python scripts/benchmark_ingestion.py
+          python scripts/perf_probe.py
+      - name: Capture experiment results and logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml -f docker-compose.lab.yml logs --no-color --tail=300 > lab-failure.log 2>&1 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: causaltrace-lab-evidence
+          path: |
+            lab-failure.log
+            benchmarks/results.live.local.json
+            benchmarks/results.ingestion.local.json
+            web/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Destroy isolated CI environment
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.lab.yml down --volumes --remove-orphans || true

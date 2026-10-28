@@ -1,0 +1,13 @@
+{
+  "precision": 0.918918918918919,
+  "recall": 0.723404255319149,
+  "f1": 0.8095238095238095,
+  "false_alert_rate": 0.0196078431372549,
+  "samples": 200,
+  "model": "iforest-v1",
+  "test_seed": 3003,
+  "train_seed": 1001,
+  "validation_seed": 2002,
+  "selected_threshold": 0,
+  "data_origin": "reproducible synthetic mathematical fixture, NOT real fault injections"
+}

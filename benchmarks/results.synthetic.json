@@ -1,0 +1,57 @@
+{
+  "ml_detection": {
+    "precision": 0.918918918918919,
+    "recall": 0.723404255319149,
+    "f1": 0.8095238095238095,
+    "false_alert_rate": 0.0196078431372549,
+    "samples": 200,
+    "model": "iforest-v1",
+    "test_seed": 3003,
+    "train_seed": 1001,
+    "validation_seed": 2002,
+    "selected_threshold": 0,
+    "data_origin": "reproducible synthetic mathematical fixture, NOT real fault injections"
+  },
+  "ranking": {
+    "ablation": {
+      "severity": {
+        "top1": 0.4125,
+        "top3": 0.95,
+        "mrr": 0.66125,
+        "cases": 80
+      },
+      "graph": {
+        "top1": 0.6375,
+        "top3": 0.9875,
+        "mrr": 0.8072916666666666,
+        "cases": 80
+      },
+      "temporal": {
+        "top1": 0.8375,
+        "top3": 1.0,
+        "mrr": 0.91875,
+        "cases": 80
+      },
+      "full": {
+        "top1": 0.9125,
+        "top3": 1.0,
+        "mrr": 0.95625,
+        "cases": 80
+      }
+    },
+    "by_target_top1": {
+      "auth": 1.0,
+      "cache": 0.7777777777777778,
+      "catalog": 1.0,
+      "checkout": 1.0,
+      "database": 0.7777777777777778,
+      "gateway": 1.0,
+      "inventory": 0.8888888888888888,
+      "notification": 0.8888888888888888,
+      "payment": 0.875
+    },
+    "cases": 80,
+    "test_seed": 3003,
+    "data_origin": "synthetic propagation fixture; NOT instrumented lab observations"
+  }
+}

@@ -1,0 +1,108 @@
+name: causaltrace
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: causaltrace
+      POSTGRES_USER: causaltrace
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U causaltrace -d causaltrace"]
+      interval: 5s
+      timeout: 4s
+      retries: 15
+    networks: [backend]
+    security_opt: [no-new-privileges:true]
+  migrate:
+    build: .
+    user: "65534:65534"
+    command: ["alembic", "upgrade", "head"]
+    environment: &api_env
+      DATABASE_URL: postgresql+psycopg://causaltrace:${DB_PASSWORD:?Set DB_PASSWORD}@postgres:5432/causaltrace
+      CAUSALTRACE_API_KEY: ${CAUSALTRACE_API_KEY:?Set CAUSALTRACE_API_KEY}
+      CAUSALTRACE_LAB: isolated-compose-only
+    depends_on:
+      postgres: {condition: service_healthy}
+    networks: [backend]
+    restart: "no"
+  # Disposable verification database. Neither application data nor named
+  # pgdata volumes are mounted here, even when the lab is already running.
+  postgres-test:
+    profiles: [verification]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: causaltrace_test
+      POSTGRES_USER: causaltrace_test
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U causaltrace_test -d causaltrace_test"]
+      interval: 5s
+      timeout: 4s
+      retries: 15
+    networks: [backend]
+    security_opt: [no-new-privileges:true]
+  postgres-check:
+    profiles: [verification]
+    build:
+      context: .
+      dockerfile: Dockerfile.tests
+    environment:
+      DATABASE_URL: postgresql+psycopg://causaltrace_test:${DB_PASSWORD:?Set DB_PASSWORD}@postgres-test:5432/causaltrace_test
+      CAUSALTRACE_TEST_POSTGRES: postgresql+psycopg://causaltrace_test:${DB_PASSWORD:?Set DB_PASSWORD}@postgres-test:5432/causaltrace_test
+    depends_on:
+      postgres-test: {condition: service_healthy}
+    networks: [backend]
+    security_opt: [no-new-privileges:true]
+    restart: "no"
+  api:
+    build: .
+    environment: *api_env
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    networks: [backend,telemetry]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.115.1
+    command: ["--config=/etc/otelcol/collector.yaml"]
+    volumes: ["./infra/otel/collector.yaml:/etc/otelcol/collector.yaml:ro"]
+    environment:
+      CAUSALTRACE_API_KEY: ${CAUSALTRACE_API_KEY:?Set CAUSALTRACE_API_KEY}
+    depends_on:
+      api: {condition: service_healthy}
+    networks: [telemetry]
+    security_opt: [no-new-privileges:true]
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    networks: [backend]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+  web:
+    build: ./web
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on:
+      api: {condition: service_healthy}
+    networks: [telemetry]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/"]
+      interval: 15s
+      retries: 3
+networks:
+  backend: {internal: true}
+  telemetry: {internal: false}
+volumes:
+  pgdata: {}

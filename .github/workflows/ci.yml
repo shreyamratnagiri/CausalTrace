@@ -1,0 +1,77 @@
+name: CausalTrace Quality Gates
+"on":
+  push:
+  pull_request:
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: test-password-only
+          POSTGRES_USER: causaltrace
+          POSTGRES_DB: causaltrace_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U causaltrace -d causaltrace_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://causaltrace:test-password-only@localhost:5432/causaltrace_test
+      CAUSALTRACE_API_KEY: ${{ secrets.CI_TEST_KEY || 'ci-local-testing-key-longer-than-sixteen-chars' }}
+      CAUSALTRACE_TEST_POSTGRES: postgresql+psycopg://causaltrace:test-password-only@localhost:5432/causaltrace_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Clean installation
+        run: python -m pip install -e '.[dev]'
+      - name: Python syntax checks
+        run: python -m compileall -q causaltrace demo benchmarks scripts tests
+      - name: Python lint
+        run: ruff check causaltrace benchmarks scripts tests demo
+      - name: Python type check
+        run: mypy causaltrace/analytics.py causaltrace/ml.py causaltrace/schemas.py
+      - name: Database migrations
+        run: alembic upgrade head
+      - name: Unit and integration tests
+        run: pytest -q
+      - name: Real SDK OTLP loopback smoke
+        run: python scripts/smoke_otlp.py
+      - name: Real two-process distributed trace propagation smoke
+        run: python scripts/smoke_distributed_http.py
+      - name: Reproducible seeded evaluation
+        run: python benchmarks/evaluate.py
+      - name: Dependency scan
+        run: pip-audit --progress-spinner off
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Enforce committed npm lockfile
+        run: test -f package-lock.json || { echo 'Missing package-lock.json. Generate via npm install --package-lock-only and commit the result.'; exit 1; }
+      - name: Install from resolved lockfile
+        run: npm ci --no-audit --no-fund
+      - name: ESLint
+        run: npm run lint
+      - name: Prettier check
+        run: npm run format:check
+      - name: TypeScript strict
+        run: npm run typecheck
+      - name: Frontend unit tests
+        run: npm run test
+      - name: Audit deployed frontend dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Frontend production build
+        run: npm run build
+      - name: Browser integration preparation
+        run: npx playwright install --with-deps chromium
+      - name: Browser smoke
+        run: npm run test:e2e

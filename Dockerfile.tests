@@ -1,0 +1,11 @@
+# Local/CI-only PostgreSQL migration and transaction checks; not deployed by default.
+FROM python:3.12-slim
+WORKDIR /app
+COPY pyproject.toml alembic.ini ./
+COPY causaltrace ./causaltrace
+COPY migrations ./migrations
+COPY tests ./tests
+RUN pip install --no-cache-dir -e '.[dev]'
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+USER 65534:65534
+CMD ["sh", "-ec", "alembic upgrade head && pytest -q tests/test_postgres.py tests/test_postgres_integrity.py -rs"]

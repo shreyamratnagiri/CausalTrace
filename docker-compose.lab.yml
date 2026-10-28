@@ -1,0 +1,182 @@
+# Shared health check ensures Compose `up --wait` does not equate
+# "container started" with "service is ready to accept HTTP".
+x-service-health: &service_health
+  test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8100/health', timeout=2)"]
+  interval: 5s
+  timeout: 3s
+  retries: 15
+  start_period: 5s
+
+# All microservices are Docker DNS allowlisted and have no host port bindings.
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: demo/microservices/Dockerfile
+    healthcheck: *service_health
+    environment:
+      SERVICE_NAME: gateway
+      CAUSALTRACE_LAB: isolated-compose-only
+      CAUSALTRACE_API_KEY: ${CAUSALTRACE_API_KEY:?Required}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      LAB_DATABASE_URL: postgresql://causaltrace:${DB_PASSWORD:?Required}@postgres:5432/causaltrace
+    depends_on:
+      collector: {condition: service_started}
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    networks: [backend, telemetry]
+    security_opt: [no-new-privileges:true]
+    ports: ["127.0.0.1:8100:8100"]
+  auth:
+    build:
+      context: .
+      dockerfile: demo/microservices/Dockerfile
+    healthcheck: *service_health
+    environment:
+      SERVICE_NAME: auth
+      CAUSALTRACE_LAB: isolated-compose-only
+      CAUSALTRACE_API_KEY: ${CAUSALTRACE_API_KEY:?Required}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      LAB_DATABASE_URL: postgresql://causaltrace:${DB_PASSWORD:?Required}@postgres:5432/causaltrace
+    depends_on:
+      collector: {condition: service_started}
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    networks: [backend, telemetry]
+    security_opt: [no-new-privileges:true]
+  catalog:
+    build:
+      context: .
+      dockerfile: demo/microservices/Dockerfile
+    healthcheck: *service_health
+    environment:
+      SERVICE_NAME: catalog
+      CAUSALTRACE_LAB: isolated-compose-only
+      CAUSALTRACE_API_KEY: ${CAUSALTRACE_API_KEY:?Required}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      LAB_DATABASE_URL: postgresql://causaltrace:${DB_PASSWORD:?Required}@postgres:5432/causaltrace
+    depends_on:
+      collector: {condition: service_started}
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    networks: [backend, telemetry]
+    security_opt: [no-new-privileges:true]
+  inventory:
+    build:
+      context: .
+      dockerfile: demo/microservices/Dockerfile
+    healthcheck: *service_health
+    environment:
+      SERVICE_NAME: inventory
+      CAUSALTRACE_LAB: isolated-compose-only
+      CAUSALTRACE_API_KEY: ${CAUSALTRACE_API_KEY:?Required}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      LAB_DATABASE_URL: postgresql://causaltrace:${DB_PASSWORD:?Required}@postgres:5432/causaltrace
+    depends_on:
+      collector: {condition: service_started}
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    networks: [backend, telemetry]
+    security_opt: [no-new-privileges:true]
+  cart:
+    build:
+      context: .
+      dockerfile: demo/microservices/Dockerfile
+    healthcheck: *service_health
+    environment:
+      SERVICE_NAME: cart
+      CAUSALTRACE_LAB: isolated-compose-only
+      CAUSALTRACE_API_KEY: ${CAUSALTRACE_API_KEY:?Required}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      LAB_DATABASE_URL: postgresql://causaltrace:${DB_PASSWORD:?Required}@postgres:5432/causaltrace
+    depends_on:
+      collector: {condition: service_started}
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    networks: [backend, telemetry]
+    security_opt: [no-new-privileges:true]
+  checkout:
+    build:
+      context: .
+      dockerfile: demo/microservices/Dockerfile
+    healthcheck: *service_health
+    environment:
+      SERVICE_NAME: checkout
+      CAUSALTRACE_LAB: isolated-compose-only
+      CAUSALTRACE_API_KEY: ${CAUSALTRACE_API_KEY:?Required}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      LAB_DATABASE_URL: postgresql://causaltrace:${DB_PASSWORD:?Required}@postgres:5432/causaltrace
+    depends_on:
+      collector: {condition: service_started}
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    networks: [backend, telemetry]
+    security_opt: [no-new-privileges:true]
+  payment:
+    build:
+      context: .
+      dockerfile: demo/microservices/Dockerfile
+    healthcheck: *service_health
+    environment:
+      SERVICE_NAME: payment
+      CAUSALTRACE_LAB: isolated-compose-only
+      CAUSALTRACE_API_KEY: ${CAUSALTRACE_API_KEY:?Required}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      LAB_DATABASE_URL: postgresql://causaltrace:${DB_PASSWORD:?Required}@postgres:5432/causaltrace
+    depends_on:
+      collector: {condition: service_started}
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    networks: [backend, telemetry]
+    security_opt: [no-new-privileges:true]
+  notification:
+    build:
+      context: .
+      dockerfile: demo/microservices/Dockerfile
+    healthcheck: *service_health
+    environment:
+      SERVICE_NAME: notification
+      CAUSALTRACE_LAB: isolated-compose-only
+      CAUSALTRACE_API_KEY: ${CAUSALTRACE_API_KEY:?Required}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      LAB_DATABASE_URL: postgresql://causaltrace:${DB_PASSWORD:?Required}@postgres:5432/causaltrace
+    depends_on:
+      collector: {condition: service_started}
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    networks: [backend, telemetry]
+    security_opt: [no-new-privileges:true]
+  database:
+    build:
+      context: .
+      dockerfile: demo/microservices/Dockerfile
+    healthcheck: *service_health
+    environment:
+      SERVICE_NAME: database
+      CAUSALTRACE_LAB: isolated-compose-only
+      CAUSALTRACE_API_KEY: ${CAUSALTRACE_API_KEY:?Required}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      LAB_DATABASE_URL: postgresql://causaltrace:${DB_PASSWORD:?Required}@postgres:5432/causaltrace
+    depends_on:
+      collector: {condition: service_started}
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    networks: [backend, telemetry]
+    security_opt: [no-new-privileges:true]
+  cache:
+    build:
+      context: .
+      dockerfile: demo/microservices/Dockerfile
+    healthcheck: *service_health
+    environment:
+      SERVICE_NAME: cache
+      CAUSALTRACE_LAB: isolated-compose-only
+      CAUSALTRACE_API_KEY: ${CAUSALTRACE_API_KEY:?Required}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      LAB_DATABASE_URL: postgresql://causaltrace:${DB_PASSWORD:?Required}@postgres:5432/causaltrace
+    depends_on:
+      collector: {condition: service_started}
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    networks: [backend, telemetry]
+    security_opt: [no-new-privileges:true]

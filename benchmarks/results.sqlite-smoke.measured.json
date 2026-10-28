@@ -1,0 +1,28 @@
+{
+  "ingestion": {
+    "origin": "measured loopback HTTP request timing, unique synthetic input events",
+    "created_at": "2026-10-27T12:11:08.764131+00:00",
+    "accepted_events": 1000,
+    "failed_batches": 0,
+    "attempted_events": 1000,
+    "throughput_events_per_second": 2407.5807862171073,
+    "p50_batch_latency_ms": 15.309781500036479,
+    "p95_batch_latency_ms": 27.168047000031947,
+    "elapsed_seconds": 0.41535470199994506
+  },
+  "query": {
+    "route": "/api/services",
+    "samples": 30,
+    "p50_ms": 1.9955020000566037,
+    "p95_ms": 3.1440579999753027,
+    "data_origin": "actual HTTP timing"
+  },
+  "storage_bytes_after": 303104,
+  "environment": {
+    "captured_at": "2026-10-27T12:11:10.647938+00:00",
+    "python": "3.13.5",
+    "platform": "Linux-6.18.55-x86_64-with-glibc2.41",
+    "data_origin": "real loopback API and SQLite, synthetic request/event inputs",
+    "not_equivalent_to": "PostgreSQL, OTLP Collector, distributed fault lab, production capacity"
+  }
+}
